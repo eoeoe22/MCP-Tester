@@ -1,0 +1,9 @@
+name = "mcp-tester-cf"
+main = "src/index.tsx"
+compatibility_date = "2024-01-29"
+
+[observability]
+enabled = true
+
+[vars]
+MCP_SERVER_DEFAULT = "https://wiki.vialinks.xyz/api/mcp"
