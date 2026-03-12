@@ -54,27 +54,27 @@ app.get('/', (c) => {
   return c.render(
     <div class="max-w-4xl mx-auto p-4 md:p-8">
       <header class="mb-8 border-b pb-4">
-        <h1 class="text-3xl font-bold text-indigo-600">MCP Tester</h1>
-        <p class="text-slate-500">Test Model Context Protocol servers over HTTP</p>
+        <h1 class="text-3xl font-bold text-indigo-600">MCP 테스터</h1>
+        <p class="text-slate-500">HTTP를 통해 Model Context Protocol 서버 테스트</p>
       </header>
 
       <div class="space-y-6">
         {/* Server Config */}
         <section class="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 class="text-lg font-semibold mb-4">Connection Settings</h2>
+          <h2 class="text-lg font-semibold mb-4">연결 설정</h2>
           <div class="flex flex-col md:flex-row gap-4">
-            <input 
-              id="mcp-url" 
-              type="text" 
-              placeholder="MCP Server URL" 
+            <input
+              id="mcp-url"
+              type="text"
+              placeholder="MCP 서버 URL"
               value={defaultUrl}
               class="flex-1 px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none"
             />
-            <button 
+            <button
               onclick="listTools()"
               class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded transition font-medium"
             >
-              Fetch Tools
+              도구 가져오기
             </button>
           </div>
         </section>
@@ -82,55 +82,55 @@ app.get('/', (c) => {
         {/* Tool Interaction */}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <section class="bg-white p-6 rounded-lg shadow-sm border">
-            <h2 class="text-lg font-semibold mb-4">Available Tools</h2>
-            <select 
-              id="tool-select" 
+            <h2 class="text-lg font-semibold mb-4">사용 가능한 도구</h2>
+            <select
+              id="tool-select"
               onchange="onToolSelect()"
               class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none mb-4"
               disabled
             >
-              <option>Fetch tools first...</option>
+              <option>먼저 도구를 가져오세요...</option>
             </select>
-            
+
             <div id="tool-description" class="text-sm text-slate-600 mb-4 h-12 overflow-y-auto italic">
-              Select a tool to see details.
+              세부 정보를 보려면 도구를 선택하세요.
             </div>
 
-            <h3 class="text-sm font-bold uppercase text-slate-400 mb-2">Arguments (JSON)</h3>
-            <textarea 
-              id="tool-args" 
+            <h3 class="text-sm font-bold uppercase text-slate-400 mb-2">인수 (JSON)</h3>
+            <textarea
+              id="tool-args"
               rows={8}
               class="w-full px-4 py-2 border rounded font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               placeholder="{}"
             ></textarea>
-            
-            <button 
+
+            <button
               id="run-btn"
               onclick="callTool()"
               disabled
               class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-6 py-2 rounded transition font-medium"
             >
-              Execute Tool
+              도구 실행
             </button>
           </section>
 
           <section class="bg-white p-6 rounded-lg shadow-sm border flex flex-col min-h-[500px]">
             <div class="flex justify-between items-center mb-4">
-              <h2 class="text-lg font-semibold">Result</h2>
+              <h2 class="text-lg font-semibold">결과</h2>
               <div class="flex gap-2">
-                <button id="view-toggle" onclick="toggleView()" class="text-xs font-bold px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600">SHOW RAW</button>
-                <span id="status-badge" class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">READY</span>
+                <button id="view-toggle" onclick="toggleView()" class="text-xs font-bold px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600">원본 보기</button>
+                <span id="status-badge" class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">준비 완료</span>
               </div>
             </div>
-            
+
             {/* Pretty View */}
             <div id="result-pretty" class="flex-1 space-y-4 overflow-auto">
-              <div class="text-slate-400 italic text-sm">Output will appear here...</div>
+              <div class="text-slate-400 italic text-sm">출력이 여기에 표시됩니다...</div>
             </div>
 
             {/* Raw View (Hidden) */}
-            <pre 
-              id="result-raw" 
+            <pre
+              id="result-raw"
               class="hidden flex-1 p-4 bg-slate-900 text-emerald-400 rounded overflow-auto font-mono text-sm"
             ></pre>
           </section>
@@ -152,7 +152,7 @@ app.get('/', (c) => {
 
         function toggleView() {
           currentView = currentView === 'pretty' ? 'raw' : 'pretty';
-          viewToggle.innerText = currentView === 'pretty' ? 'SHOW RAW' : 'SHOW PRETTY';
+          viewToggle.innerText = currentView === 'pretty' ? '원본 보기' : '형식 보기';
           resultPretty.classList.toggle('hidden', currentView === 'raw');
           resultRaw.classList.toggle('hidden', currentView === 'pretty');
         }
@@ -163,7 +163,7 @@ app.get('/', (c) => {
 
           if (data.error) {
             resultPretty.innerHTML = \`<div class="p-4 bg-red-50 border border-red-200 rounded text-red-700">
-              <div class="font-bold mb-1">Error (\${data.error.code || 'Unknown'})</div>
+              <div class="font-bold mb-1">오류 (\${data.error.code || '알 수 없음'})</div>
               <div class="text-sm">\${data.error.message || JSON.stringify(data.error)}</div>
             </div>\`;
             return;
@@ -178,12 +178,12 @@ app.get('/', (c) => {
               if (item.type === 'text') {
                 const header = document.createElement('div');
                 header.className = 'text-xs font-bold uppercase text-slate-400 mb-2 flex justify-between';
-                header.innerHTML = \`<span>Content #\${i+1} (Text)</span>\`;
-                
+                header.innerHTML = \`<span>콘텐츠 #\${i+1} (텍스트)</span>\`;
+
                 const content = document.createElement('div');
                 content.className = 'whitespace-pre-wrap text-sm text-slate-800 leading-relaxed';
                 content.innerText = item.text;
-                
+
                 container.appendChild(header);
                 container.appendChild(content);
               } else {
@@ -213,9 +213,9 @@ app.get('/', (c) => {
 
         async function listTools() {
           const url = mcpUrlInput.value;
-          statusBadge.innerText = 'FETCHING...';
+          statusBadge.innerText = '가져오는 중...';
           statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-600';
-          
+
           try {
             const res = await fetch('/api/proxy', {
               method: 'POST',
@@ -223,21 +223,21 @@ app.get('/', (c) => {
               body: JSON.stringify({ url, method: 'tools/list', params: {} })
             });
             const data = await res.json();
-            
+
             if (data.error) throw data;
-            
+
             tools = data.result.tools || [];
-            
-            toolSelect.innerHTML = tools.length > 0 
-              ? '<option value="">Select a tool...</option>' + tools.map(t => \`<option value="\${t.name}">\${t.name}</option>\`).join('')
-              : '<option>No tools found</option>';
-            
+
+            toolSelect.innerHTML = tools.length > 0
+              ? '<option value="">도구 선택...</option>' + tools.map(t => \`<option value="\${t.name}">\${t.name}</option>\`).join('')
+              : '<option>발견된 도구 없음</option>';
+
             toolSelect.disabled = false;
-            statusBadge.innerText = 'CONNECTED';
+            statusBadge.innerText = '연결됨';
             statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-600';
             renderResult(data);
           } catch (e) {
-            statusBadge.innerText = 'ERROR';
+            statusBadge.innerText = '오류';
             statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-600';
             renderResult(e);
           }
@@ -246,9 +246,9 @@ app.get('/', (c) => {
         function onToolSelect() {
           const selectedName = toolSelect.value;
           const tool = tools.find(t => t.name === selectedName);
-          
+
           if (tool) {
-            toolDescription.innerText = tool.description || 'No description.';
+            toolDescription.innerText = tool.description || '설명 없음.';
             if (tool.inputSchema && tool.inputSchema.properties) {
               const skeleton = {};
               Object.keys(tool.inputSchema.properties).forEach(key => {
@@ -261,7 +261,7 @@ app.get('/', (c) => {
             }
             runBtn.disabled = false;
           } else {
-            toolDescription.innerText = 'Select a tool to see details.';
+            toolDescription.innerText = '세부 정보를 보려면 도구를 선택하세요.';
             toolArgs.value = '';
             runBtn.disabled = true;
           }
@@ -271,36 +271,36 @@ app.get('/', (c) => {
           const url = mcpUrlInput.value;
           const name = toolSelect.value;
           let args = {};
-          
+
           try {
             args = JSON.parse(toolArgs.value || '{}');
           } catch (e) {
-            alert('Invalid JSON in arguments');
+            alert('인수의 잘못된 JSON');
             return;
           }
 
-          statusBadge.innerText = 'EXECUTING...';
+          statusBadge.innerText = '실행 중...';
           statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-600';
-          resultPretty.innerHTML = '<div class="animate-pulse text-slate-400">Executing tool...</div>';
+          resultPretty.innerHTML = '<div class="animate-pulse text-slate-400">도구 실행 중...</div>';
 
           try {
             const res = await fetch('/api/proxy', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                url, 
-                method: 'tools/call', 
-                params: { name, arguments: args } 
+              body: JSON.stringify({
+                url,
+                method: 'tools/call',
+                params: { name, arguments: args }
               })
             });
             const data = await res.json();
             renderResult(data);
             if (!data.error && !(data.result && data.result.isError)) {
-              statusBadge.innerText = 'SUCCESS';
+              statusBadge.innerText = '성공';
               statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-600';
             }
           } catch (e) {
-            statusBadge.innerText = 'FAILED';
+            statusBadge.innerText = '실패';
             statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-600';
             renderResult(e);
           }
