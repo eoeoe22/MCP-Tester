@@ -43,6 +43,7 @@ function renderResultPanel(n: string) {
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-semibold">결과</h2>
         <div class="flex gap-2">
+          <button id={`copy-btn-${n}`} onclick={`copyResult(${n})`} class="text-xs font-bold px-2 py-1 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-600">복사</button>
           <button id={`view-toggle-${n}`} onclick={`toggleView(${n})`} class="text-xs font-bold px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600">원본 보기</button>
           <span id={`status-badge-${n}`} class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">준비 완료</span>
         </div>
@@ -93,7 +94,7 @@ app.post('/api/proxy', async (c) => {
     })
     
     if (!response.ok) {
-      return c.json({ error: `Server error: ${response.status}` }, { status: response.status })
+      return c.json({ error: `Server error: ${response.status}` }, { status: response.status as any })
     }
 
     const result = await response.json()
@@ -349,6 +350,27 @@ app.get('/', (c) => {
             statusBadge.innerText = '실패';
             statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-600';
             renderResult(n, e);
+          }
+        }
+
+        async function copyResult(n) {
+          const rawText = document.getElementById('result-raw-' + n).innerText;
+          if (!rawText) return;
+          
+          try {
+            await navigator.clipboard.writeText(rawText);
+            const btn = document.getElementById('copy-btn-' + n);
+            const originalText = btn.innerText;
+            btn.innerText = '복사됨!';
+            btn.classList.replace('text-indigo-600', 'text-emerald-600');
+            btn.classList.replace('bg-indigo-100', 'bg-emerald-100');
+            setTimeout(() => {
+              btn.innerText = originalText;
+              btn.classList.replace('text-emerald-600', 'text-indigo-600');
+              btn.classList.replace('bg-emerald-100', 'bg-indigo-100');
+            }, 2000);
+          } catch (err) {
+            console.error('복사 실패:', err);
           }
         }
       ` }} />
