@@ -1,7 +1,15 @@
 import { Hono } from 'hono'
 import { jsxRenderer } from 'hono/jsx-renderer'
+import { countTokens, listModels, type ModelInfo, type TokenEnv, type TokenProvider } from './tokens'
 
-const app = new Hono()
+type Bindings = {
+  MCP_SERVER_DEFAULT: string
+  MCP_SERVER_DEFAULT_2: string
+  ANTHROPIC_API_KEY: string
+  GEMINI_API_KEY: string
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 
 function renderToolPanel(n: string) {
   return (
@@ -48,6 +56,7 @@ function renderResultPanel(n: string) {
           <span id={`status-badge-${n}`} class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">준비 완료</span>
         </div>
       </div>
+      <div id={`token-count-${n}`} class="hidden mb-4"></div>
       <div id={`result-pretty-${n}`} class="flex-1 space-y-4 overflow-auto">
         <div class="text-slate-400 italic text-sm">출력이 여기에 표시됩니다...</div>
       </div>
@@ -104,8 +113,39 @@ app.post('/api/proxy', async (c) => {
   }
 })
 
+app.post('/api/load-models', async (c) => {
+  const env = c.env as TokenEnv
+  try {
+    const [claude, gemini] = await Promise.all([
+      listModels('claude', env),
+      listModels('gemini', env)
+    ])
+    return c.json({ claude, gemini })
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, { status: 500 })
+  }
+})
+
+app.post('/api/count-tokens', async (c) => {
+  const env = c.env as TokenEnv
+  try {
+    const { provider, text, model } = await c.req.json() as {
+      provider: TokenProvider
+      text: string
+      model?: ModelInfo
+    }
+    if (provider !== 'claude' && provider !== 'gemini') {
+      return c.json({ error: 'invalid provider' }, { status: 400 })
+    }
+    const result = await countTokens(provider, text ?? '', env, model)
+    return c.json(result)
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, { status: 500 })
+  }
+})
+
 app.get('/', (c) => {
-  const env = c.env as { MCP_SERVER_DEFAULT: string; MCP_SERVER_DEFAULT_2: string }
+  const env = c.env
   const url1 = env.MCP_SERVER_DEFAULT || ''
   const url2 = env.MCP_SERVER_DEFAULT_2 || ''
 
@@ -115,6 +155,21 @@ app.get('/', (c) => {
         <h1 class="text-3xl font-bold text-indigo-600">MCP 테스터</h1>
         <p class="text-slate-500">HTTP를 통해 Model Context Protocol 서버 테스트</p>
       </header>
+
+      <section class="bg-white p-4 rounded-lg shadow-sm border mb-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="token-count-enabled" onchange="onTokenCountToggle()" class="w-4 h-4" />
+          <span class="font-medium">토큰 카운트 활성화</span>
+          <span id="token-count-status" class="text-xs text-slate-500"></span>
+        </label>
+        <div id="token-model-row" class="hidden mt-3 flex flex-col md:flex-row gap-3 md:items-center">
+          <label class="text-sm font-medium text-slate-700">모델:</label>
+          <select id="token-provider" onchange="onTokenProviderChange()" class="px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="">선택...</option>
+          </select>
+          <div id="token-model-info" class="text-xs text-slate-500 font-mono"></div>
+        </div>
+      </section>
 
       {/* Server Tabs */}
       <div class="mb-6">
@@ -174,8 +229,144 @@ app.get('/', (c) => {
       <script dangerouslySetInnerHTML={{ __html: `
         const state = {
           1: { tools: [], currentView: 'pretty' },
-          2: { tools: [], currentView: 'pretty' }
+          2: { tools: [], currentView: 'pretty' },
+          tokenCount: {
+            enabled: false,
+            models: null,
+            selected: ''
+          }
         };
+
+        async function onTokenCountToggle() {
+          const cb = document.getElementById('token-count-enabled');
+          const row = document.getElementById('token-model-row');
+          const status = document.getElementById('token-count-status');
+          const sel = document.getElementById('token-provider');
+          state.tokenCount.enabled = cb.checked;
+
+          if (!cb.checked) {
+            row.classList.add('hidden');
+            [1, 2].forEach(n => {
+              const box = document.getElementById('token-count-' + n);
+              box.classList.add('hidden');
+              box.innerHTML = '';
+            });
+            return;
+          }
+
+          row.classList.remove('hidden');
+
+          if (state.tokenCount.models) {
+            return;
+          }
+
+          status.innerText = '모델 목록 로드 중...';
+          sel.innerHTML = '<option value="">로드 중...</option>';
+
+          try {
+            const res = await fetch('/api/load-models', { method: 'POST' });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            state.tokenCount.models = data;
+
+            const defaultKey = 'gemini:' + data.gemini.defaultModelId;
+            const buildGroup = (label, list) => {
+              if (!list.models.length) return '';
+              const opts = list.models.map(m => {
+                const key = m.provider + ':' + m.modelId;
+                const isDefault = m.modelId === list.defaultModelId;
+                const suffix = isDefault ? ' (기본)' : '';
+                return '<option value="' + key + '">' + m.modelId + suffix + '</option>';
+              }).join('');
+              return '<optgroup label="' + label + '">' + opts + '</optgroup>';
+            };
+
+            sel.innerHTML = '<option value="">선택...</option>'
+              + buildGroup('Claude', data.claude)
+              + buildGroup('Gemini', data.gemini);
+            sel.value = defaultKey;
+            state.tokenCount.selected = defaultKey;
+            onTokenProviderChange();
+            status.innerText = 'Claude ' + data.claude.models.length + '개 / Gemini ' + data.gemini.models.length + '개 로드됨';
+          } catch (e) {
+            status.innerText = '모델 로드 실패: ' + e.message;
+            sel.innerHTML = '<option value="">로드 실패</option>';
+          }
+        }
+
+        function getSelectedModel() {
+          const key = state.tokenCount.selected;
+          if (!key || !state.tokenCount.models) return null;
+          const idx = key.indexOf(':');
+          if (idx < 0) return null;
+          const provider = key.slice(0, idx);
+          const modelId = key.slice(idx + 1);
+          const list = state.tokenCount.models[provider];
+          if (!list) return null;
+          return list.models.find(m => m.modelId === modelId) || null;
+        }
+
+        function onTokenProviderChange() {
+          const sel = document.getElementById('token-provider');
+          const info = document.getElementById('token-model-info');
+          state.tokenCount.selected = sel.value;
+          const m = getSelectedModel();
+          if (!m) {
+            info.innerText = '';
+            return;
+          }
+          info.innerText = m.provider + ' · ' + m.modelId + ' · max ' + m.maxTokens.toLocaleString() + ' tokens';
+        }
+
+        function extractMcpText(data) {
+          if (!data || !data.result || !Array.isArray(data.result.content)) return '';
+          return data.result.content
+            .filter(c => c && c.type === 'text' && typeof c.text === 'string')
+            .map(c => c.text)
+            .join('\\n');
+        }
+
+        async function runTokenCount(n, data) {
+          const box = document.getElementById('token-count-' + n);
+          const model = getSelectedModel();
+          if (!state.tokenCount.enabled || !model) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+          }
+          const text = extractMcpText(data);
+          if (!text) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+          }
+
+          box.classList.remove('hidden');
+          box.innerHTML = '<div class="text-xs text-slate-500">토큰 카운트 중... (' + model.provider + ')</div>';
+
+          try {
+            const res = await fetch('/api/count-tokens', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ provider: model.provider, text, model })
+            });
+            const r = await res.json();
+            if (r.error) throw new Error(r.error);
+
+            const safeColor = r.safe ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700';
+            const safeLabel = r.safe ? 'SAFE' : 'OVER LIMIT';
+            box.innerHTML =
+              '<div class="text-xs font-bold uppercase text-slate-400 mb-2">토큰 카운트 (' + model.provider + ' · ' + model.modelId + ')</div>' +
+              '<div class="p-3 border rounded ' + safeColor + ' text-sm flex flex-wrap gap-x-6 gap-y-1">' +
+                '<div><span class="font-bold">' + r.tokens.toLocaleString() + '</span> tokens</div>' +
+                '<div>잔여: <span class="font-bold">' + r.remaining.toLocaleString() + '</span></div>' +
+                '<div>한도: ' + model.maxTokens.toLocaleString() + '</div>' +
+                '<div class="ml-auto font-bold">' + safeLabel + '</div>' +
+              '</div>';
+          } catch (e) {
+            box.innerHTML = '<div class="p-3 border border-red-200 bg-red-50 text-red-700 rounded text-sm">토큰 카운트 실패: ' + e.message + '</div>';
+          }
+        }
 
         function switchTab(n) {
           [1, 2].forEach(i => {
@@ -372,6 +563,7 @@ app.get('/', (c) => {
               statusBadge.innerText = '성공';
               statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-600';
             }
+            runTokenCount(n, data);
           } catch (e) {
             statusBadge.innerText = '실패';
             statusBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-600';
