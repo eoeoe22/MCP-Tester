@@ -200,12 +200,21 @@ app.get('/', (c) => {
           raw.classList.toggle('hidden', s.currentView === 'pretty');
         }
 
+        function sanitizeForRaw(data) {
+          return JSON.parse(JSON.stringify(data, (key, value) => {
+            if (key === 'data' && typeof value === 'string' && value.length > 256) {
+              return \`<base64 이미지 데이터 생략됨 (\${value.length} 문자)>\`;
+            }
+            return value;
+          }));
+        }
+
         function renderResult(n, data) {
           const resultRaw = document.getElementById('result-raw-' + n);
           const resultPretty = document.getElementById('result-pretty-' + n);
           const statusBadge = document.getElementById('status-badge-' + n);
 
-          resultRaw.innerText = JSON.stringify(data, null, 2);
+          resultRaw.innerText = JSON.stringify(sanitizeForRaw(data), null, 2);
           resultPretty.innerHTML = '';
 
           if (data.error) {
