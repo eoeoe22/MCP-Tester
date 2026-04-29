@@ -57,8 +57,11 @@ export async function listModels(provider: TokenProvider, env: TokenEnv): Promis
       maxTokens: GEMINI_MAX
     }))
   if (!models.length) throw new Error('No Gemini models returned')
-  const defaultMatch = models.find(m => m.modelId.includes('flash') && !m.modelId.includes('lite'))
-  return { models, defaultModelId: (defaultMatch ?? models[0]).modelId }
+  const isFlashNonLite = (id: string) => id.includes('flash') && !id.includes('lite')
+  const preferred =
+    models.find(m => m.modelId.startsWith('gemini-3-flash') && !m.modelId.includes('lite')) ??
+    models.find(m => isFlashNonLite(m.modelId))
+  return { models, defaultModelId: (preferred ?? models[0]).modelId }
 }
 
 export async function loadModel(provider: TokenProvider, env: TokenEnv): Promise<ModelInfo> {
