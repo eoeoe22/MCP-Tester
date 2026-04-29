@@ -230,6 +230,23 @@ app.get('/', (c) => {
                 content.innerText = item.text;
                 container.appendChild(header);
                 container.appendChild(content);
+              } else if (item.type === 'image' && item.data) {
+                const mimeType = item.mimeType || 'image/png';
+                const header = document.createElement('div');
+                header.className = 'text-xs font-bold uppercase text-slate-400 mb-2 flex justify-between';
+                header.innerHTML = \`<span>콘텐츠 #\${i+1} (이미지)</span><span class="normal-case text-slate-500">\${mimeType}</span>\`;
+                const img = document.createElement('img');
+                img.src = \`data:\${mimeType};base64,\${item.data}\`;
+                img.alt = \`이미지 #\${i+1}\`;
+                img.className = 'max-w-full h-auto rounded border bg-white';
+                img.onerror = () => {
+                  img.replaceWith(Object.assign(document.createElement('div'), {
+                    className: 'text-sm text-red-600',
+                    innerText: '이미지를 디코딩할 수 없습니다.'
+                  }));
+                };
+                container.appendChild(header);
+                container.appendChild(img);
               } else {
                 const pre = document.createElement('pre');
                 pre.className = 'text-xs overflow-auto text-slate-600';
