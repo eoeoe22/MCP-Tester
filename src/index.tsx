@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jsxRenderer } from 'hono/jsx-renderer'
-import { countTokens, loadModel, type ModelInfo, type TokenEnv, type TokenProvider } from './tokens'
+import { countTokens, listModels, type ModelInfo, type TokenEnv, type TokenProvider } from './tokens'
 
 type Bindings = {
   MCP_SERVER_DEFAULT: string
@@ -56,6 +56,7 @@ function renderResultPanel(n: string) {
           <span id={`status-badge-${n}`} class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-500">준비 완료</span>
         </div>
       </div>
+      <div id={`token-count-${n}`} class="hidden mb-4"></div>
       <div id={`result-pretty-${n}`} class="flex-1 space-y-4 overflow-auto">
         <div class="text-slate-400 italic text-sm">출력이 여기에 표시됩니다...</div>
       </div>
@@ -63,7 +64,6 @@ function renderResultPanel(n: string) {
         id={`result-raw-${n}`}
         class="hidden flex-1 p-4 bg-slate-900 text-emerald-400 rounded overflow-auto font-mono text-sm"
       ></pre>
-      <div id={`token-count-${n}`} class="hidden mt-4 pt-4 border-t"></div>
     </section>
   )
 }
@@ -117,8 +117,8 @@ app.post('/api/load-models', async (c) => {
   const env = c.env as TokenEnv
   try {
     const [claude, gemini] = await Promise.all([
-      loadModel('claude', env),
-      loadModel('gemini', env)
+      listModels('claude', env),
+      listModels('gemini', env)
     ])
     return c.json({ claude, gemini })
   } catch (error) {
@@ -268,26 +268,54 @@ app.get('/', (c) => {
             const data = await res.json();
             if (data.error) throw new Error(data.error);
             state.tokenCount.models = data;
+
+            const defaultKey = 'gemini:' + data.gemini.defaultModelId;
+            const buildGroup = (label, list) => {
+              if (!list.models.length) return '';
+              const opts = list.models.map(m => {
+                const key = m.provider + ':' + m.modelId;
+                const isDefault = m.modelId === list.defaultModelId;
+                const suffix = isDefault ? ' (기본)' : '';
+                return '<option value="' + key + '">' + m.modelId + suffix + '</option>';
+              }).join('');
+              return '<optgroup label="' + label + '">' + opts + '</optgroup>';
+            };
+
             sel.innerHTML = '<option value="">선택...</option>'
-              + '<option value="claude">Claude — ' + data.claude.modelId + '</option>'
-              + '<option value="gemini">Gemini — ' + data.gemini.modelId + '</option>';
-            status.innerText = '모델 로드 완료';
+              + buildGroup('Claude', data.claude)
+              + buildGroup('Gemini', data.gemini);
+            sel.value = defaultKey;
+            state.tokenCount.selected = defaultKey;
+            onTokenProviderChange();
+            status.innerText = 'Claude ' + data.claude.models.length + '개 / Gemini ' + data.gemini.models.length + '개 로드됨';
           } catch (e) {
             status.innerText = '모델 로드 실패: ' + e.message;
             sel.innerHTML = '<option value="">로드 실패</option>';
           }
         }
 
+        function getSelectedModel() {
+          const key = state.tokenCount.selected;
+          if (!key || !state.tokenCount.models) return null;
+          const idx = key.indexOf(':');
+          if (idx < 0) return null;
+          const provider = key.slice(0, idx);
+          const modelId = key.slice(idx + 1);
+          const list = state.tokenCount.models[provider];
+          if (!list) return null;
+          return list.models.find(m => m.modelId === modelId) || null;
+        }
+
         function onTokenProviderChange() {
           const sel = document.getElementById('token-provider');
           const info = document.getElementById('token-model-info');
           state.tokenCount.selected = sel.value;
-          if (!sel.value || !state.tokenCount.models) {
+          const m = getSelectedModel();
+          if (!m) {
             info.innerText = '';
             return;
           }
-          const m = state.tokenCount.models[sel.value];
-          info.innerText = m.modelId + ' · max ' + m.maxTokens.toLocaleString() + ' tokens';
+          info.innerText = m.provider + ' · ' + m.modelId + ' · max ' + m.maxTokens.toLocaleString() + ' tokens';
         }
 
         function extractMcpText(data) {
@@ -300,7 +328,8 @@ app.get('/', (c) => {
 
         async function runTokenCount(n, data) {
           const box = document.getElementById('token-count-' + n);
-          if (!state.tokenCount.enabled || !state.tokenCount.selected || !state.tokenCount.models) {
+          const model = getSelectedModel();
+          if (!state.tokenCount.enabled || !model) {
             box.classList.add('hidden');
             box.innerHTML = '';
             return;
@@ -312,17 +341,14 @@ app.get('/', (c) => {
             return;
           }
 
-          const provider = state.tokenCount.selected;
-          const model = state.tokenCount.models[provider];
-
           box.classList.remove('hidden');
-          box.innerHTML = '<div class="text-xs text-slate-500">토큰 카운트 중... (' + provider + ')</div>';
+          box.innerHTML = '<div class="text-xs text-slate-500">토큰 카운트 중... (' + model.provider + ')</div>';
 
           try {
             const res = await fetch('/api/count-tokens', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ provider, text, model })
+              body: JSON.stringify({ provider: model.provider, text, model })
             });
             const r = await res.json();
             if (r.error) throw new Error(r.error);
@@ -330,7 +356,7 @@ app.get('/', (c) => {
             const safeColor = r.safe ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700';
             const safeLabel = r.safe ? 'SAFE' : 'OVER LIMIT';
             box.innerHTML =
-              '<div class="text-xs font-bold uppercase text-slate-400 mb-2">토큰 카운트 (' + provider + ' · ' + model.modelId + ')</div>' +
+              '<div class="text-xs font-bold uppercase text-slate-400 mb-2">토큰 카운트 (' + model.provider + ' · ' + model.modelId + ')</div>' +
               '<div class="p-3 border rounded ' + safeColor + ' text-sm flex flex-wrap gap-x-6 gap-y-1">' +
                 '<div><span class="font-bold">' + r.tokens.toLocaleString() + '</span> tokens</div>' +
                 '<div>잔여: <span class="font-bold">' + r.remaining.toLocaleString() + '</span></div>' +
