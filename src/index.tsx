@@ -572,11 +572,12 @@ app.get('/', (c) => {
         }
 
         async function copyResult(n) {
-          const rawText = document.getElementById('result-raw-' + n).innerText;
-          if (!rawText) return;
-          
+          const sourceId = state[n].currentView === 'pretty' ? 'result-pretty-' : 'result-raw-';
+          const text = document.getElementById(sourceId + n).innerText;
+          if (!text) return;
+
           try {
-            await navigator.clipboard.writeText(rawText);
+            await navigator.clipboard.writeText(text);
             const btn = document.getElementById('copy-btn-' + n);
             const originalText = btn.innerText;
             btn.innerText = '복사됨!';
